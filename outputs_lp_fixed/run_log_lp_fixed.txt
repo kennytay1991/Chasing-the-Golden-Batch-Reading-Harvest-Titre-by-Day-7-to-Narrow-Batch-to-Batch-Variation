@@ -1,0 +1,327 @@
+============================================================================================================
+lp_v5_fixed.py - harvest plan for one 9-batch plant campaign (mixed-integer linear programme, review fixes 1 to 7)
+============================================================================================================
+The model in three sentences:
+  Objective: first make the lowest forecast harvest titre among the campaign's 9 batches as high as
+    possible, then, holding that floor, make the total titre as large as possible, and then use as few
+    interventions, as little temperature shift, as little extra feed and as few inoculation slips as
+    possible.
+  Decisions: on culture day 7, which few batches get an intervention, how much extra feed (0 to 100 L) and
+    how far to lower the temperature (0 to 3 C) they get, a provisional harvest culture day (13, 14 or 15)
+    with an inoculation slip of 0 or 1 day, and whether a batch must fall back to an early harvest; on
+    culture day 13 a rolling rule fixes each batch's final harvest day from its measured viability, titre
+    and dead-cell density.
+  Constraints: an intervention budget per campaign and at most one intervention per week, viability at
+    harvest at or above the trigger unless the batch falls back to day 13, working volume, osmolality,
+    Protein A capacity, dead-cell density and downstream time per harvest, tank turnaround with one
+    maintenance day per tank, at least K days between harvests unless pooled, no Sunday harvests, one
+    blocked downstream day and, where it applies, a site shutdown.
+Solver: HiGHS (highspy) through PuLP 4.1.0, MIP gap 1e-9, feasibility tolerances 1e-9
+Emergency harvests on a Sunday: EMERGENCY_OVERRIDES_SUNDAY = True (ASSUMPTION: call-out crew)
+Settled base case: FEED_TITRE_EFFECT = 0.0 (ASSUMPTION), TEMP_SHIFT_ALLOWED = False (DATA); scenario 'bench trial confirms levers' = {'FEED_TITRE_EFFECT': 0.5, 'TEMP_SHIFT_ALLOWED': True, 'TEMP_EFF': 2.0, 'TEMP_VIAB': 2.0, 'MAX_INTERVENTIONS_PER_CAMPAIGN': 2}
+
+[2] Viability scale VIAB_C = 1.2512; DATA parameters from 60 bench main-product runs:
+    m13 = 0.9018 (n = 55), m15 = 1.0729 (n = 57), m16 = 1.1673 (n = 23, fence test only)
+    viability change: day 13 to 14 = -4.18 (n = 55), day 14 to 15 = -4.94 (n = 57), day 14 to 16 = -10.80; day 7 to 14 = -22.68 (n = 58)
+    FAST_DROP = |5th percentile of day-to-day viability change, days 8 to 16| = |-10.440| = 10.440 points (n = 425)
+    DS2 dead-cell density Xd = VCD x (1/viability - 1): median ratio day 14/13 = 1.1885 (n = 55), day 15/14 = 1.1582 (n = 57)
+[2] Temperature shift in the AZ data (main-product bench runs starting at the same temperature, rescaled 1):
+    shifted on day 6-7 n =  4  viability change day 7 to 14 -26.5 points, viability day 14 67.3%, titre day 14 mean 0.414 / median 0.388 (0-1 scale)  C38 C39 C42 C43
+    constant           n = 23  viability change day 7 to 14 -31.3 points, viability day 14 59.8%, titre day 14 mean 0.621 / median 0.646 (0-1 scale)  
+    shifted vs constant day-14 titre: -40% by median, -33% by mean (different campaigns, so not a controlled comparison)
+[2] DS3 evidence, Endpoint Set (n = 44 harvests with TCD > 0): Spearman monomer % vs viability index VCD/TCD = 0.38 (p = 0.011); monomer % vs [mAb] = 0.08 (p = 0.62)
+[2] DS2 limit = largest business-as-usual dead-cell density at harvest = 0.2745 (C25, day 14)
+[2] Kallang scale s = 8.0 / 0.441375 = 18.1252; no-model forecast for every batch = 8.0 g/L (FIX 6)
+run  volume_L  tank  F_V5_g_L  actual_d13  actual_d14  actual_d15  viab_d7  viab14_forecast  viab_d12  viab_d13  viab_d14  viab_d15
+ C1     500.0     0      8.33        7.31        7.48        7.72    94.43            71.75     74.92     60.60     46.25     13.87
+C14     250.0     1      9.12        9.32        9.70       10.06    89.98            67.30     73.20     68.88     60.30     55.59
+C25     100.0     2     10.50       10.63       10.73       11.13    87.21            64.53     50.30     49.67     38.78     33.90
+C37      50.0     0      6.67        4.52        5.52        6.07    92.15            69.47     74.06     67.28     65.60     62.16
+C77     250.0     1      7.13        6.72        7.65        8.25    96.11            73.42     89.44     87.19     84.92     82.51
+C79     250.0     2      7.23        6.05        6.99        7.74    95.07            72.39     84.70     82.40     79.67     78.03
+C88     250.0     0      7.87        6.63        7.43        8.53    93.47            70.78     81.03     77.32     72.06     71.38
+C90     250.0     1      7.47        8.35        9.13       10.44    97.00            74.31     87.04     83.69     82.13     79.96
+C97     250.0     2      7.41        6.59        7.37        8.26    96.27            73.59     83.16     79.52     78.07     76.03
+[3] base         calendar, planned inoculation days: [0, 8, 15, 23, 30, 38, 46, 53, 61]
+[3] full load    calendar, planned inoculation days: [0, 6, 11, 17, 23, 28, 34, 40, 45]
+[3] full load 18 calendar, planned inoculation days: [0, 6, 12, 18, 24, 30, 36, 42, 48]
+[3] shutdown     calendar, planned inoculation days: [0, 8, 15, 23, 30, 38, 67, 71, 75]; shutdown days 53 to 66
+
+[5] Business as usual (day 14, no intervention) on actual data: lowest 5.517, mean 8.000, SD 1.577 g/L, 144.0 kg; viability below trigger: 2 (C1 C25); largest harvest 21.46 kg (C25)
+
+[6] Budget curve under 'bench trial confirms levers' (in the settled base case interventions add nothing, so every budget gives the same plan). Scored on ACTUAL data with the day-13 harvest days (21 s). value_lowest = (plan - BAU) / (perfect - BAU); SD_change_vs_BAU = plan SD - BAU SD (g/L):
+ budget                  plan  lowest_g_L  SD_g_L  total_kg  viability_below_trigger  early_harvests  extra_protein_a_cycles  provisional_lowest_g_L  provisional_SD_g_L  provisional_viability_below_trigger  value_lowest  SD_change_vs_BAU                             helped
+      0       (a) V5 forecast       5.517   1.610   152.733                      1.0             1.0                     0.0                   6.073               1.507                                3.000         0.000             0.033                                   
+      0 (b) no model, average       5.517   1.610   152.733                      1.0             1.0                     0.0                   6.073               1.507                                3.000         0.000             0.033              every combination (1)
+      0 (c) perfect foresight       6.073   1.488   153.844                      1.0             1.0                     0.0                   6.073               1.488                                1.000         1.000            -0.089                                   
+      1       (a) V5 forecast       6.541   1.396   154.782                      1.0             1.0                     0.0                   6.541               1.412                                3.000         1.000            -0.181                                C37
+      1 (b) no model, average       5.631   1.625   154.216                      1.0             1.0                     0.0                   6.125               1.546                                2.889         0.111             0.049              every combination (9)
+      1 (c) perfect foresight       6.541   1.396   154.782                      1.0             1.0                     0.0                   6.541               1.396                                1.000         1.000            -0.181                                C37
+      2       (a) V5 forecast       6.541   1.392   156.083                      1.0             1.0                     0.0                   6.541               1.403                                3.000         1.000            -0.185                            C37 C77
+      2 (b) no model, average       5.745   1.637   155.700                      1.0             1.0                     0.0                   6.177               1.581                                2.778         0.222             0.061             every combination (36)
+      2 (c) perfect foresight       6.541   1.559   157.162                      1.0             1.0                     0.0                   6.541               1.559                                1.000         1.000            -0.017                            C14 C37
+      3       (a) V5 forecast       6.541   1.539   157.587                      1.0             1.0                     0.0                   6.541               1.637                                3.000         1.000            -0.037                        C25 C37 C77
+      3 (b) no model, average       5.859   1.646   157.183                      1.0             1.0                     0.0                   6.229               1.611                                2.667         0.333             0.069             every combination (84)
+      3 (c) perfect foresight       6.541   1.719   158.986                      1.0             1.0                     0.0                   6.541               1.719                                1.000         1.000             0.143                        C14 C25 C37
+      4       (a) V5 forecast       6.541   1.624   159.235                      1.0             1.0                     0.0                   6.541               1.731                                2.000         1.000             0.048                    C14 C25 C37 C77
+      4 (b) no model, average       5.972   1.650   158.667                      1.0             1.0                     0.0                   6.281               1.638                                2.556         0.444             0.073            every combination (126)
+      4 (c) perfect foresight       6.541   1.826   160.538                      1.0             1.0                     0.0                   6.541               1.826                                1.000         1.000             0.249                    C14 C25 C37 C90
+      5       (a) V5 forecast       6.541   1.562   160.506                      1.0             1.0                     0.0                   6.541               1.685                                2.000         1.000            -0.015                 C1 C14 C25 C37 C77
+      5 (b) no model, average       6.086   1.651   160.150                      1.0             1.0                     0.0                   6.333               1.660                                2.444         0.556             0.074            every combination (126)
+      5 (c) perfect foresight       6.541   1.809   161.839                      1.0             1.0                     0.0                   6.541               1.809                                1.000         1.000             0.232                C14 C25 C37 C77 C90
+      6       (a) V5 forecast       6.541   1.556   161.770                      1.0             1.0                     0.0                   6.541               1.673                                2.000         1.000            -0.021             C1 C14 C25 C37 C77 C88
+      6 (b) no model, average       6.200   1.647   161.634                      1.0             1.0                     0.0                   6.385               1.678                                2.333         0.667             0.071             every combination (84)
+      6 (c) perfect foresight       6.541   1.746   163.111                      1.0             1.0                     0.0                   6.541               1.746                                1.000         1.000             0.170             C1 C14 C25 C37 C77 C90
+      7       (a) V5 forecast       6.541   1.664   163.323                      1.0             1.0                     0.0                   6.541               1.766                                2.000         1.000             0.087         C1 C14 C25 C37 C77 C88 C90
+      7 (b) no model, average       6.314   1.640   163.117                      1.0             1.0                     0.0                   6.437               1.693                                2.222         0.778             0.064             every combination (36)
+      7 (c) perfect foresight       6.541   1.735   164.375                      1.0             1.0                     0.0                   6.541               1.735                                1.000         1.000             0.158         C1 C14 C25 C37 C77 C88 C90
+      8       (a) V5 forecast       6.541   1.639   164.575                      1.0             1.0                     0.0                   6.541               1.736                                2.000         1.000             0.062     C1 C14 C25 C37 C77 C88 C90 C97
+      8 (b) no model, average       6.428   1.629   164.601                      1.0             1.0                     0.0                   6.489               1.704                                2.111         0.889             0.053              every combination (9)
+      8 (c) perfect foresight       6.541   1.708   165.627                      1.0             1.0                     0.0                   6.541               1.708                                1.000         1.000             0.131     C1 C14 C25 C37 C77 C88 C90 C97
+      9       (a) V5 forecast       6.541   1.586   165.764                      1.0             1.0                     0.0                   6.541               1.680                                2.000         1.000             0.010 C1 C14 C25 C37 C77 C79 C88 C90 C97
+      9 (b) no model, average       6.541   1.614   166.084                      1.0             1.0                     0.0                   6.541               1.711                                2.000         1.000             0.038              every combination (1)
+      9 (c) perfect foresight       6.541   1.655   166.816                      1.0             1.0                     0.0                   6.541               1.655                                1.000         1.000             0.078 C1 C14 C25 C37 C77 C79 C88 C90 C97
+
+[6] Ties after stage 3 (FIX 2):
+ budget                  plan  any_tie                                                                                                           tie_detail
+      0       (a) V5 forecast    False                             day/intervention False; slip False; feed/temp amounts False (range 0.0e+00 L, 0.0e+00 C)
+      0 (b) no model, average    False                                               no-model LP alone would help ; ties: day/intervention False; levers []
+      0 (c) perfect foresight    False                                                          day/intervention False; slip False; feed/temp amounts False
+      1       (a) V5 forecast    False                             day/intervention False; slip False; feed/temp amounts False (range 6.0e-04 L, 7.5e-06 C)
+      1 (b) no model, average    False                                no-model LP alone would help C25; ties: day/intervention False; levers [(100.0, 3.0)]
+      1 (c) perfect foresight    False                                                          day/intervention False; slip False; feed/temp amounts False
+      2       (a) V5 forecast    False                             day/intervention False; slip False; feed/temp amounts False (range 6.0e-04 L, 7.5e-06 C)
+      2 (b) no model, average     True                              no-model LP alone would help C1 C25; ties: day/intervention True; levers [(100.0, 3.0)]
+      2 (c) perfect foresight    False                                                          day/intervention False; slip False; feed/temp amounts False
+      3       (a) V5 forecast    False                             day/intervention False; slip False; feed/temp amounts False (range 6.9e-04 L, 8.6e-06 C)
+      3 (b) no model, average     True                          no-model LP alone would help C1 C25 C90; ties: day/intervention True; levers [(100.0, 3.0)]
+      3 (c) perfect foresight    False                                                          day/intervention False; slip False; feed/temp amounts False
+      4       (a) V5 forecast    False                             day/intervention False; slip False; feed/temp amounts False (range 6.9e-04 L, 8.6e-06 C)
+      4 (b) no model, average     True                      no-model LP alone would help C1 C25 C90 C97; ties: day/intervention True; levers [(100.0, 3.0)]
+      4 (c) perfect foresight    False                                                          day/intervention False; slip False; feed/temp amounts False
+      5       (a) V5 forecast    False                             day/intervention False; slip False; feed/temp amounts False (range 6.9e-04 L, 8.6e-06 C)
+      5 (b) no model, average     True                  no-model LP alone would help C1 C14 C25 C90 C97; ties: day/intervention True; levers [(100.0, 3.0)]
+      5 (c) perfect foresight    False                                                          day/intervention False; slip False; feed/temp amounts False
+      6       (a) V5 forecast    False                             day/intervention False; slip False; feed/temp amounts False (range 6.9e-04 L, 8.6e-06 C)
+      6 (b) no model, average     True              no-model LP alone would help C1 C14 C25 C88 C90 C97; ties: day/intervention True; levers [(100.0, 3.0)]
+      6 (c) perfect foresight    False                                                          day/intervention False; slip False; feed/temp amounts False
+      7       (a) V5 forecast    False                             day/intervention False; slip False; feed/temp amounts False (range 6.9e-04 L, 8.6e-06 C)
+      7 (b) no model, average     True          no-model LP alone would help C1 C14 C25 C37 C88 C90 C97; ties: day/intervention True; levers [(100.0, 3.0)]
+      7 (c) perfect foresight    False                                                          day/intervention False; slip False; feed/temp amounts False
+      8       (a) V5 forecast    False                             day/intervention False; slip False; feed/temp amounts False (range 6.9e-04 L, 8.6e-06 C)
+      8 (b) no model, average     True      no-model LP alone would help C1 C14 C25 C37 C77 C88 C90 C97; ties: day/intervention True; levers [(100.0, 3.0)]
+      8 (c) perfect foresight    False                                                          day/intervention False; slip False; feed/temp amounts False
+      9       (a) V5 forecast    False                             day/intervention False; slip False; feed/temp amounts False (range 6.9e-04 L, 8.6e-06 C)
+      9 (b) no model, average    False no-model LP alone would help C1 C14 C25 C37 C77 C79 C88 C90 C97; ties: day/intervention False; levers [(100.0, 3.0)]
+      9 (c) perfect foresight    False                                                          day/intervention False; slip False; feed/temp amounts False
+
+[7] Settled base case (FEED_TITRE_EFFECT = 0.0, TEMP_SHIFT_ALLOWED = False), plan (a), budget 2: day-7 plan, then the day-13 rule (actual data):
+run  intervene  feed_L  temp_shift_C  forecast_after_g_L  provisional_day  final_day  final_calendar_day final_weekday  EARLY_HARVEST  measured_viab_d13  actual_viability_provisional_pct  actual_viability_final_pct  actual_titre_provisional_g_L  actual_titre_final_g_L  kg_final
+ C1          0     0.0           0.0                8.93               15         13                  13           Sun          False              60.60                             13.87                       60.60                          7.72                    7.31     14.61
+C14          0     0.0           0.0                9.79               15         14                  22           Tue          False              68.88                             55.59                       60.30                         10.06                    9.70     19.39
+C25          0     0.0           0.0               10.50               14         13                  28           Mon           True              49.67                             38.78                       49.67                         10.73                   10.63     21.26
+C37          0     0.0           0.0                7.15               15         14                  37           Wed          False              67.28                             62.16                       65.60                          6.07                    5.52     11.03
+C77          0     0.0           0.0                7.65               15         15                  46           Fri          False              87.19                             82.51                       82.51                          8.25                    8.25     16.50
+C79          0     0.0           0.0                7.75               15         15                  53           Fri          False              82.40                             78.03                       78.03                          7.74                    7.74     15.49
+C88          0     0.0           0.0                8.45               15         15                  61           Sat          False              77.32                             71.38                       71.38                          8.53                    8.53     17.05
+C90          0     0.0           0.0                8.02               15         15                  68           Sat          False              83.69                             79.96                       79.96                         10.44                   10.44     20.87
+C97          0     0.0           0.0                7.95               15         15                  77           Mon          False              79.52                             76.03                       76.03                          8.26                    8.26     16.52
+    C1   day 15 -> 13: fast drop: viability fell 14.3 points from day 12 to 13 (> 10.44); harvest now  [emergency harvest breaks: Sunday (call-out crew, EMERGENCY_OVERRIDES_SUNDAY)]
+    C14  day 15 -> 14: latest day passing viability, DS1, DS2, DS4 and the schedule [day 15: projected viability 59.8% < 60% (DS3)]
+    C25  day 14 -> 13: EARLY_HARVEST: measured viability 49.7% on day 13 is below the trigger
+    C37  day 15 -> 14: latest day passing viability, DS1, DS2, DS4 and the schedule [day 15: projected viability 58.2% < 60% (DS3)]
+    C77  day 15 -> 15: latest day passing viability, DS1, DS2, DS4 and the schedule
+    C79  day 15 -> 15: latest day passing viability, DS1, DS2, DS4 and the schedule
+    C88  day 15 -> 15: latest day passing viability, DS1, DS2, DS4 and the schedule
+    C90  day 15 -> 15: latest day passing viability, DS1, DS2, DS4 and the schedule
+    C97  day 15 -> 15: latest day passing viability, DS1, DS2, DS4 and the schedule
+
+[7] Summary, settled base case at budget 2 (actual data; value_lowest = (plan - BAU) / (perfect - BAU); SD_change_vs_BAU = plan SD - BAU SD, g/L); the levers row is the scenario, for comparison:
+                                        plan              scored_on  lowest_g_L  mean_g_L  SD_g_L  CV_pct  total_kg  interventions  viability_below_trigger  early_harvests  extra_protein_a_cycles  value_lowest  SD_change_vs_BAU                           value_lowest_against
+ business as usual (day 14, no intervention)                      -       5.517     8.000   1.577  19.708   144.000              0                      2.0             0.0                     0.0           0.0             0.000                                              -
+                             (a) V5 forecast      day-13 final days       5.517     8.485   1.610  18.970   152.733              0                      1.0             1.0                     0.0           0.0             0.033                 settled base perfect foresight
+                             (a) V5 forecast day-7 provisional days       6.073     8.644   1.507  17.431   155.588              0                      3.0             0.0                     0.0           1.0            -0.070                 settled base perfect foresight
+                       (c) perfect foresight      day-13 final days       6.073     8.547   1.488  17.406   153.844              0                      1.0             1.0                     0.0           1.0            -0.089                 settled base perfect foresight
+                       (c) perfect foresight day-7 provisional days       6.073     8.547   1.488  17.406   153.844              0                      1.0             1.0                     0.0           1.0            -0.089                 settled base perfect foresight
+(a) V5 forecast, bench trial confirms levers      day-13 final days       6.541     8.671   1.392  16.055   156.083              2                      1.0             1.0                     0.0           1.0            -0.185 perfect foresight, bench trial confirms levers
+       (b) no model, average of combinations      day-13 final days       5.517     8.485   1.610  18.970   152.733              0                      1.0             1.0                     0.0           0.0             0.033                 settled base perfect foresight
+       (b) no model, average of combinations day-7 provisional days       6.073     8.644   1.507  17.431   155.588              0                      3.0             0.0                     0.0           1.0            -0.070                 settled base perfect foresight
+
+[8] Option B at budget 2: maximise total titre with every batch >= floor (planned on forecasts; actual columns use the day-13 rule):
+ calendar  floor_share_of_target  floor_g_L     status                                         planned_total_kg  planned_lowest_g_L helped  actual_total_kg  actual_lowest_g_L
+     base                  0.850        6.8    Optimal                                               152.385787               7.151                 152.733              5.517
+     base                  0.875        7.0    Optimal                                               152.385787               7.151                 152.733              5.517
+     base                  0.900        7.2 Infeasible infeasible: floor above the best achievable lowest batch                 NaN    NaN              NaN                NaN
+     base                  0.925        7.4 Infeasible infeasible: floor above the best achievable lowest batch                 NaN    NaN              NaN                NaN
+     base                  0.950        7.6 Infeasible infeasible: floor above the best achievable lowest batch                 NaN    NaN              NaN                NaN
+     base                  0.975        7.8 Infeasible infeasible: floor above the best achievable lowest batch                 NaN    NaN              NaN                NaN
+     base                  1.000        8.0 Infeasible infeasible: floor above the best achievable lowest batch                 NaN    NaN              NaN                NaN
+full load                  0.850        6.8 Infeasible infeasible: floor above the best achievable lowest batch                 NaN    NaN              NaN                NaN
+full load                  0.875        7.0 Infeasible infeasible: floor above the best achievable lowest batch                 NaN    NaN              NaN                NaN
+full load                  0.900        7.2 Infeasible infeasible: floor above the best achievable lowest batch                 NaN    NaN              NaN                NaN
+full load                  0.925        7.4 Infeasible infeasible: floor above the best achievable lowest batch                 NaN    NaN              NaN                NaN
+full load                  0.950        7.6 Infeasible infeasible: floor above the best achievable lowest batch                 NaN    NaN              NaN                NaN
+full load                  0.975        7.8 Infeasible infeasible: floor above the best achievable lowest batch                 NaN    NaN              NaN                NaN
+full load                  1.000        8.0 Infeasible infeasible: floor above the best achievable lowest batch                 NaN    NaN              NaN                NaN
+
+[8] Binding fences at budget 2: gain from relaxing each fence alone (planned lowest; actual with the day-13 rule):
+ calendar                          fence_relaxed  status  lowest_before_g_L  lowest_after_g_L  gain_lowest_g_L  gain_total_kg  actual_lowest_after_g_L  gain_actual_lowest_g_L  gain_actual_total_kg
+     base            viability trigger -5 points Optimal             7.1514            7.1514           0.0000         1.5298                   6.0725                  0.5555                1.8428
+     base               +1 intervention per week Optimal             7.1514            7.1514           0.0000         0.0000                   5.5170                  0.0000                0.0000
+     base +1 intervention in the campaign budget Optimal             7.1514            7.1514           0.0000         0.0000                   5.5170                  0.0000                0.0000
+     base                    +50 L feed headroom Optimal             7.1514            7.1514           0.0000         0.0000                   5.5170                  0.0000                0.0000
+     base             K - 1 day between harvests Optimal             7.1514            7.1514           0.0000         0.0000                   5.5170                  0.0000                0.0000
+     base         +1 day harvest window (day 16) Optimal             7.1514            7.1514           0.0000         7.0974                      NaN                     NaN                   NaN
+     base                         no Sunday rule Optimal             7.1514            7.1514           0.0000         0.0000                   5.5170                  0.0000                0.0000
+full load            viability trigger -5 points Optimal             6.6658            6.6658           0.0000         0.0000                   5.5170                  0.0000                0.0000
+full load               +1 intervention per week Optimal             6.6658            6.6658           0.0000         0.0000                   5.5170                  0.0000                0.0000
+full load +1 intervention in the campaign budget Optimal             6.6658            6.6658           0.0000         0.0000                   5.5170                  0.0000                0.0000
+full load                    +50 L feed headroom Optimal             6.6658            6.6658           0.0000         0.0000                   5.5170                  0.0000                0.0000
+full load             K - 1 day between harvests Optimal             6.6658            6.6658           0.0000         0.0000                   5.5170                  0.0000                4.1758
+full load         +1 day harvest window (day 16) Optimal             6.6658            6.6658           0.0000         1.4118                   5.5170                  0.0000                0.0000
+full load                         no Sunday rule Optimal             6.6658            7.1312           0.4654         1.1272                   5.5170                  0.0000                2.3180
+
+[8] Scenarios at budget 2 (plan a; scored on actual data with the day-13 rule; settled base unless named):
+                   scenario  status  planned_lowest_g_L  planned_total_kg  helped                         early_day7  lowest_g_L  SD_g_L  total_kg  viability_below_trigger  provisional_viability_below_trigger  early_harvests  extra_protein_a_cycles  max_kg_per_harvest  max_dead_cell_density  relative_protein_a_cycles               harvest_days  pairs_that_could_share_a_day                                     emergency_harvests schedule_clashes  any_tie  perfect_lowest_g_L  value_lowest
+                       base Optimal               7.151           152.386                                                  5.517   1.610   152.733                        1                                    3               1                       0              21.262                  0.203                      1.061 13 14 13 14 15 15 15 15 15                             0 C1: Sunday (call-out crew, EMERGENCY_OVERRIDES_SUNDAY)                     False               6.073           0.0
+      full load (64 a year) Optimal               6.666           144.989                                                  5.517   1.452   145.117                        1                                    2               1                       0              21.262                  0.203                      1.008 13 13 13 14 14 14 15 13 15                             0 C1: Sunday (call-out crew, EMERGENCY_OVERRIDES_SUNDAY)                     False               5.517           NaN
+         shutdown (14 days) Optimal               7.151           151.333                                                  5.517   1.542   146.447                        1                                    3               1                       0              21.262                  0.203                      1.017 13 14 13 14 15 14 14 14 15                             0 C1: Sunday (call-out crew, EMERGENCY_OVERRIDES_SUNDAY)                     False               6.073           0.0
+                trigger 70% Optimal               6.011           138.303                                        C25       4.517   1.874   144.816                        4                                    4               4                       0              21.262                  0.203                      1.006 13 13 13 13 14 15 14 15 14                             0 C1: Sunday (call-out crew, EMERGENCY_OVERRIDES_SUNDAY)                     False               4.517           1.0
+                trigger 80% Optimal               6.011           129.380         C1 C14 C25 C37 C77 C79 C88 C90 C97       4.517   1.818   134.112                        6                                    6               6                       0              21.262                  0.203                      0.931 13 13 13 13 14 13 13 13 13                             0                                                                            False               4.517           1.0
+            pooling allowed Optimal               7.151           152.386                                                  5.517   1.610   152.733                        1                                    3               1                       0              21.262                  0.203                      1.061 13 14 13 14 15 15 15 15 15                             0 C1: Sunday (call-out crew, EMERGENCY_OVERRIDES_SUNDAY)                     False               6.073           0.0
+bench trial confirms levers Optimal               7.718           154.731 C37 C77                                          6.541   1.392   156.083                        1                                    3               1                       0              21.262                  0.203                      1.084 13 14 13 15 15 15 15 15 15                             0 C1: Sunday (call-out crew, EMERGENCY_OVERRIDES_SUNDAY)                     False               6.541           1.0
+
+[8] Lever-effect sweep at budget 2 (what-if: temperature shift allowed; base calendar; temperature viability effect held at 2 points per C):
+ feed_eff_pct_per_pct_vol  temp_eff_pct_per_C  temp_viab_pts_per_C  status  planned_lowest_g_L  planned_total_kg  helped  feed_L_total  temp_C_total  actual_lowest_g_L  actual_SD_g_L  actual_total_kg
+                      0.0                 0.0                  2.0 Optimal               7.151           153.916     C25           0.0         0.205              5.517          1.610          152.733
+                      0.0                 2.0                  2.0 Optimal               7.551           155.975 C25 C37           0.0         6.000              6.404          1.548          155.793
+                      0.0                 4.0                  2.0 Optimal               7.754           155.697 C37 C77           0.0         6.000              6.735          1.364          157.005
+                      0.5                 0.0                  2.0 Optimal               7.318           154.774 C25 C37         200.0         0.205              5.655          1.625          153.545
+                      0.5                 2.0                  2.0 Optimal               7.718           154.731 C37 C77         200.0         6.000              6.541          1.392          156.083
+                      0.5                 4.0                  2.0 Optimal               7.754           156.387 C37 C77         200.0         6.000              6.873          1.349          157.664
+                      1.5                 0.0                  2.0 Optimal               7.651           154.455 C37 C77         200.0         0.000              5.931          1.516          154.709
+                      1.5                 2.0                  2.0 Optimal               7.754           156.111 C37 C77         200.0         6.000              6.817          1.355          157.400
+                      1.5                 4.0                  2.0 Optimal               7.754           157.767 C37 C77         200.0         6.000              7.148          1.330          158.981
+
+[9] Monte Carlo at budget 2, 500 draws (seed 20261021, 35 s): forecast x (1 + N(0, 0.1)), true effects U(0, 1.5) / U(0, 4) / U(0, 4), failure p = 0.05; plans use the CONFIG effects, measured viability and scoring the drawn ones (L3). Settled base case: the plan uses no interventions, so the drawn lever effects do not change its outcome.
+     feasible plans: 500 of 500; batches alive per draw: mean 8.52
+     lowest batch, failures switched off (same forecast noise and lever effects, all 9 batches; 500 of 500 draws feasible):
+       >= 7.20 g/L (90% of target): plan 0.0% of draws, business as usual 0.0%
+       median [10th, 90th percentile]: plan 5.517 [5.517, 5.517], BAU 5.517 [5.517, 5.517] g/L
+       In the settled base case the plan never changes the worst batch: C37 is harvested on day 14 with no intervention in all 500 draws, so the plan's lowest batch equals business as usual (5.517 g/L) in every draw.
+     with failures (p = 0.05), total kg median [10th, 90th percentile]: plan 152.733 [131.471, 152.733], BAU 144.000 [122.544, 144.000] kg
+     batch-to-batch SD, with failures: plan 1.610 [1.490, 1.718], BAU 1.577 [1.385, 1.673] g/L; plan SD below BAU SD in 13.2% of draws
+     actual viability below trigger per draw: day-13 days 0.94, day-7 days 2.79, BAU 1.87
+     EARLY_HARVEST per draw 0.94; extra Protein A cycles per draw: planned 0.000, needed on actual data 0.000; emergency harvests per draw 0.930
+
+[9b] Scenario 'recipe change: planned harvest day 15': every batch planned for day 15 with no interventions; the day-13 rule may pull a batch back (fast drop, viability below trigger, DS1, DS2, DS4 or schedule).
+    recipe day 15: final days 13 14 13 14 15 15 15 15 15; schedule clashes: none
+      C1   planned 15 -> final 13 (calendar day 13, Sun): fast drop: viability fell 14.3 points from day 12 to 13 (> 10.44); harvest now  [emergency harvest breaks: Sunday (call-out crew, EMERGENCY_OVERRIDES_SUNDAY)]
+      C14  planned 15 -> final 14 (calendar day 22, Tue): latest day passing viability, DS1, DS2, DS4 and the schedule [day 15: projected viability 59.8% < 60% (DS3)]
+      C25  planned 15 -> final 13 (calendar day 28, Mon)  EARLY_HARVEST: EARLY_HARVEST: measured viability 49.7% on day 13 is below the trigger
+      C37  planned 15 -> final 14 (calendar day 37, Wed): latest day passing viability, DS1, DS2, DS4 and the schedule [day 15: projected viability 58.2% < 60% (DS3)]
+      C77  planned 15 -> final 15 (calendar day 46, Fri): latest day passing viability, DS1, DS2, DS4 and the schedule
+      C79  planned 15 -> final 15 (calendar day 53, Fri): latest day passing viability, DS1, DS2, DS4 and the schedule
+      C88  planned 15 -> final 15 (calendar day 61, Sat): latest day passing viability, DS1, DS2, DS4 and the schedule
+      C90  planned 15 -> final 15 (calendar day 68, Sat): latest day passing viability, DS1, DS2, DS4 and the schedule
+      C97  planned 15 -> final 15 (calendar day 77, Mon): latest day passing viability, DS1, DS2, DS4 and the schedule
+    recipe day 15, full load 18 calendar: final days 13 13 13 14 15 15 15 15 15; schedule clashes: none
+      C1   planned 14 -> final 13 (calendar day 13, Sun): fast drop: viability fell 14.3 points from day 12 to 13 (> 10.44); harvest now  [planned day 14: day 15 would break the tank turnaround or harvest spacing]  [emergency harvest breaks: Sunday (call-out crew, EMERGENCY_OVERRIDES_SUNDAY)]
+      C14  planned 15 -> final 13 (calendar day 19, Sat): latest day passing viability, DS1, DS2, DS4 and the schedule [day 15: projected viability 59.8% < 60% (DS3), DS4: 22.2 kg needs 4.2 days before C25's earliest possible harvest | day 14: Sunday]
+      C25  planned 14 -> final 13 (calendar day 25, Fri)  EARLY_HARVEST: EARLY_HARVEST: measured viability 49.7% on day 13 is below the trigger  [planned day 14: day 15 would break the tank turnaround or harvest spacing]
+      C37  planned 15 -> final 14 (calendar day 32, Fri): latest day passing viability, DS1, DS2, DS4 and the schedule [day 15: projected viability 58.2% < 60% (DS3)]
+      C77  planned 15 -> final 15 (calendar day 39, Fri): latest day passing viability, DS1, DS2, DS4 and the schedule
+      C79  planned 15 -> final 15 (calendar day 46, Fri): latest day passing viability, DS1, DS2, DS4 and the schedule
+      C88  planned 15 -> final 15 (calendar day 51, Wed): latest day passing viability, DS1, DS2, DS4 and the schedule
+      C90  planned 15 -> final 15 (calendar day 58, Wed): latest day passing viability, DS1, DS2, DS4 and the schedule
+      C97  planned 15 -> final 15 (calendar day 64, Tue): latest day passing viability, DS1, DS2, DS4 and the schedule
+    recipe day 15 + bench trial confirms levers: final days 13 14 13 15 15 15 15 15 15; schedule clashes: none
+      C1   planned 15 -> final 13 (calendar day 13, Sun): fast drop: viability fell 14.3 points from day 12 to 13 (> 10.44); harvest now  [emergency harvest breaks: Sunday (call-out crew, EMERGENCY_OVERRIDES_SUNDAY)]
+      C14  planned 15 -> final 14 (calendar day 22, Tue): latest day passing viability, DS1, DS2, DS4 and the schedule [day 15: projected viability 59.8% < 60% (DS3)]
+      C25  planned 15 -> final 13 (calendar day 28, Mon)  EARLY_HARVEST: EARLY_HARVEST: measured viability 49.7% on day 13 is below the trigger
+      C37  planned 15 -> final 15 (calendar day 38, Thu): latest day passing viability, DS1, DS2, DS4 and the schedule
+      C77  planned 15 -> final 15 (calendar day 46, Fri): latest day passing viability, DS1, DS2, DS4 and the schedule
+      C79  planned 15 -> final 15 (calendar day 53, Fri): latest day passing viability, DS1, DS2, DS4 and the schedule
+      C88  planned 15 -> final 15 (calendar day 61, Sat): latest day passing viability, DS1, DS2, DS4 and the schedule
+      C90  planned 15 -> final 15 (calendar day 68, Sat): latest day passing viability, DS1, DS2, DS4 and the schedule
+      C97  planned 15 -> final 15 (calendar day 77, Mon): latest day passing viability, DS1, DS2, DS4 and the schedule
+
+[9b] Recipe against business as usual, actual data (relative Protein A cycles = total kg / (16 kg x batches); value_lowest against each recipe's own perfect foresight):
+                                       plan  lowest_g_L  mean_g_L  SD_g_L  total_kg  total_kg_change_pct  kg_per_batch  viability_below_trigger below_trigger_runs  early_harvests  max_kg_per_harvest max_kg_run  max_dead_cell_density max_dead_cell_run  relative_protein_a_cycles  DS1_fails  DS2_fails  DS3_fails  DS4_fails               harvest_days  perfect_lowest_g_L  value_lowest
+      business as usual (day 14, no action)       5.517     8.000   1.577   144.000                0.000        16.000                        2             C1 C25               0              21.456        C25                  0.275               C25                      1.000          0          0          2          0 14 14 14 14 14 14 14 14 14                 NaN           NaN
+                              recipe day 15       5.517     8.485   1.610   152.733                6.065        16.970                        1                C25               1              21.262        C25                  0.203               C25                      1.061          0          0          1          0 13 14 13 14 15 15 15 15 15               6.073           0.0
+       recipe day 15, full load 18 calendar       5.517     8.444   1.579   151.985                5.545        16.887                        1                C25               1              21.262        C25                  0.203               C25                      1.055          0          0          1          0 13 13 13 14 15 15 15 15 15               6.073           0.0
+recipe day 15 + bench trial confirms levers       6.541     8.671   1.392   156.083                8.391        17.343                        1                C25               1              21.262        C25                  0.203               C25                      1.084          0          0          1          0 13 14 13 15 15 15 15 15 15               6.541           1.0
+
+[9b] Downstream fences per harvest (DS1 Protein A <= 24 kg; DS2 dead cells <= 0.275; DS3 viability >= 60%; DS4 gap after harvest >= K x kg / 16):
+     harvest_culture_day_BAU  kg_actual_BAU  protein_a_utilisation_BAU  dead_cell_density_BAU  actual_viability_pct_BAU  harvest_culture_day_recipe  kg_actual_recipe  protein_a_utilisation_recipe  dead_cell_density_recipe  actual_viability_pct_recipe  DS1_protein_a_ok  DS2_dead_cells_ok  DS3_viability_ok  DS4_downstream_time_ok
+run                                                                                                                                                                                                                                                                                                                                      
+C1                        14         14.958                      0.623                  0.208                    46.253                          13            14.613                         0.609                     0.151                       60.600              True               True              True                    True
+C14                       14         19.391                      0.808                  0.123                    60.299                          14            19.391                         0.808                     0.123                       60.299              True               True              True                    True
+C25                       14         21.456                      0.894                  0.275                    38.775                          13            21.262                         0.886                     0.203                       49.672              True               True             False                    True
+C37                       14         11.034                      0.460                  0.101                    65.599                          14            11.034                         0.460                     0.101                       65.599              True               True              True                    True
+C77                       14         15.308                      0.638                  0.039                    84.923                          15            16.504                         0.688                     0.045                       82.510              True               True              True                    True
+C79                       14         13.989                      0.583                  0.051                    79.667                          15            15.486                         0.645                     0.053                       78.027              True               True              True                    True
+C88                       14         14.869                      0.620                  0.075                    72.061                          15            17.052                         0.710                     0.076                       71.384              True               True              True                    True
+C90                       14         18.264                      0.761                  0.062                    82.135                          15            20.870                         0.870                     0.069                       79.959              True               True              True                    True
+C97                       14         14.731                      0.614                  0.077                    78.066                          15            16.522                         0.688                     0.078                       76.025              True               True              True                    True
+    DS3 evidence (Endpoint Set, n = 44): monomer % rises with the viability index (Spearman 0.38, p = 0.011) but not with titre (0.08, p = 0.62); HCP, DNA and glycans are not in the data.
+
+[9b] Annual view (1095 tank-days a year; a tank is busy 17 days per day-14 batch, 18 per day-15 batch):
+          view                                                         plan  batches_per_year  batches_exact  kg_per_batch  kg_per_year  change_vs_BAU_pct  tank_days_per_batch  tank_days_used  tank_days_spare
+  demand-bound                                            business as usual                48          48.00         16.00       768.00               0.00                   17             816              279
+  demand-bound                                    recipe day 15, 48 batches                48          48.00         16.97       814.58               6.06                   18             864              231
+  demand-bound          recipe day 15, batches to make business-as-usual kg                46          45.26         16.97       780.64               1.65                   18             828              267
+  demand-bound                           recipe day 15 + levers, 48 batches                48          48.00         17.34       832.44               8.39                   18             864              231
+  demand-bound recipe day 15 + levers, batches to make business-as-usual kg                45          44.28         17.34       780.42               1.62                   18             810              285
+capacity-bound                                            business as usual                64          64.00         16.00      1024.00               0.00                   17            1088                7
+capacity-bound                                                recipe day 15                60          60.00         16.97      1018.22              -0.56                   18            1080               15
+capacity-bound                                       recipe day 15 + levers                60          60.00         17.34      1040.55               1.62                   18            1080               15
+
+[10] Checks
+  [PASS] BAU: lowest 5.517, mean 8.000, SD 1.577, 144.0 kg, 2 below 60% (C1 C25)
+  [PASS] FAST_DROP = 10.440 (n = 425); fast-drop rule fires for ['C1'] (C1 fell 14.32 points from day 12 to 13)
+  (the budget checks below run under 'bench trial confirms levers'; in the settled base every budget is the same)
+  [PASS] budget 0: V5 lowest 5.517, SD 1.610
+  [PASS] budget 1: V5 helps C37; lowest 6.541; SD 1.396; final days 13 14 13 15 15 15 15 15 15; no-model average lowest 5.631
+  [PASS] budget 2: V5 helps C37 C77; lowest 6.541; SD 1.392; no-model average lowest 5.745
+  [PASS] budget 9: V5 lowest 6.541, SD 1.586, 165.764 kg; no-model average lowest 6.541
+  [PASS] below 60% viability on actual data, V5: day-13 days [1, 1, 1, 1, 1, 1, 1, 1, 1, 1] by budget (C25, EARLY_HARVEST); day-7 days [3, 3, 3, 3, 2, 2, 2, 2, 2, 2]
+  [PASS] Monte Carlo: 0 infeasible draws (with failures and with failures switched off)
+  [PASS] constraints recomputed from the solution values in every optimal solve (5047 solves): max violation 1.05e-11 (6 levers need an intervention, C77)
+  [PASS] no plan, scenario, combination or Monte Carlo solve is infeasible (statuses: {'Optimal': 4956, 'Infeasible': 91})
+         Option B floors with no plan (floor above the best achievable lowest batch, not a clash): ['option B, base, floor 7.20', 'option B, base, floor 7.40', 'option B, base, floor 7.60', 'option B, base, floor 7.80', 'option B, base, floor 8.00', 'option B, full load, floor 6.80', 'option B, full load, floor 7.00', 'option B, full load, floor 7.20', 'option B, full load, floor 7.40', 'option B, full load, floor 7.60', 'option B, full load, floor 7.80', 'option B, full load, floor 8.00']
+         tie tests: 258 solves; 'Infeasible' there means no tie
+  [PASS] genuine schedule clashes in the day-13 rule (plan a, every budget): none
+  [PASS] no inoculation-slip ties after stage 3 (slips priced at 1; V5, no-model LP and perfect foresight at every budget, and the scenarios): none
+  [PASS] recipe: total 152.733 kg (+6.04% from the one-decimal total 152.7, +6.06% unrounded, vs 144.0; one-decimal values checked to 0.05), lowest 5.517, SD 1.610, final days 13 14 13 14 15 15 15 15 15, below 60%: 1 (C25, EARLY_HARVEST True)
+  [PASS] downstream: max 21.26 kg per harvest (C25) <= 24; max dead-cell density 0.203 (C25) <= 0.275, batches above: 0; relative Protein A cycles 1.061
+  [PASS] capacity-bound: 64 vs 60 batches a year
+  [PASS] recipe on the 18-day full-load calendar: no schedule clashes (final days 13 13 13 14 15 15 15 15 15)
+
+[11] Limitations
+  1. Settled base case: FEED_TITRE_EFFECT = 0.0 and TEMP_SHIFT_ALLOWED = False, so interventions add nothing
+     and the base plan is a harvest-day plan. Every lever result comes from the 'bench trial confirms
+     levers' scenario, whose effects are assumptions the AZ data cannot test.
+  2. The temperature evidence is 4 shifted against 23 unshifted bench runs from different campaigns: -40% by
+     median day-14 titre, -33% by mean; not a controlled comparison.
+  3. Downstream fences are proxies. Dead-cell density (from VCD and the VCD/TCD viability index) stands in
+     for clarification load and HCP/DNA release; monomer % is measured only in the Endpoint Set (one value
+     per harvest, all cell lines and scales). HCP, DNA and glycans are not measured anywhere in the data, so
+     no product-quality limit can be checked directly.
+  4. Annual views assume every batch of the year matches this 9-run campaign's kg per batch, on fixed 17- or
+     18-day tank cycles.
+  5. EMERGENCY_OVERRIDES_SUNDAY = True (ASSUMPTION: call-out crew): a day-13 emergency harvest may fall on a
+     Sunday (C1 does). With False it waits for the next working day in the window.
+  6. The day-13 rule projects viability with bench median changes (-4.18 to day 14, a further -4.94 to day
+     15); they were too cautious for C37 and cannot foresee a collapse like C1's.
+  7. Nine plant runs of 50 to 500 L stand in for 2,000 L batches, rescaled so business as usual averages 8.0
+     g/L; C25 alone drives the Protein A and viability limits.
+  8. Day 16 has titre data for 5 of the 9 runs, so the '+1 day harvest window' gain is forecast only.
+  9. Perfect foresight maximises the lowest batch and the total, not the spread, so it is no benchmark for
+     SD; spread is reported as SD_change_vs_BAU (plan SD - BAU SD) rather than as a share of perfect
+     foresight.
+  10. The budget, calendar, maintenance days, spacing and Protein A margin are assumptions (see the CONFIG
+     labels).
+
+Outputs in C:\Users\tiffa\OneDrive\Desktop\Lessons for business analytics\Chasing the Golden Batch Reading Harvest Titre by Day 7 to Narrow Batch to Batch Variation\outputs_lp_fixed (16 files); run time 64 s

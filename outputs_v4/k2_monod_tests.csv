@@ -1,0 +1,4 @@
+model,R2,params
+constant growth rate (reference),0.0,mu = 0.303
+Monod on glucose,0.03369559332121075,"mu_max = 0.765, Ks_glc = 0.4554"
+Monod on glucose with ammonia and lactate inhibition,0.44581516678389566,"mu_max = 3.000, Ks_glc = 0.0778, KI_amm = 0.001, KI_lac = 0.054  (AT BOUND, not identifiable: mu_max, KI_amm)"

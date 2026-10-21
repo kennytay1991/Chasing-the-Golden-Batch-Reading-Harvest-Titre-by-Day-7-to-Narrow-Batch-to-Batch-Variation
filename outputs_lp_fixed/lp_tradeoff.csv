@@ -1,0 +1,15 @@
+calendar,floor_share_of_target,floor_g_L,status,planned_total_kg,planned_lowest_g_L,helped,actual_total_kg,actual_lowest_g_L
+base,0.85,6.8,Optimal,152.3857867089369,7.1514,,152.733,5.517
+base,0.875,7.0,Optimal,152.3857867089369,7.1514,,152.733,5.517
+base,0.9,7.2,Infeasible,infeasible: floor above the best achievable lowest batch,,,,
+base,0.925,7.4,Infeasible,infeasible: floor above the best achievable lowest batch,,,,
+base,0.95,7.6,Infeasible,infeasible: floor above the best achievable lowest batch,,,,
+base,0.975,7.8,Infeasible,infeasible: floor above the best achievable lowest batch,,,,
+base,1.0,8.0,Infeasible,infeasible: floor above the best achievable lowest batch,,,,
+full load,0.85,6.8,Infeasible,infeasible: floor above the best achievable lowest batch,,,,
+full load,0.875,7.0,Infeasible,infeasible: floor above the best achievable lowest batch,,,,
+full load,0.9,7.2,Infeasible,infeasible: floor above the best achievable lowest batch,,,,
+full load,0.925,7.4,Infeasible,infeasible: floor above the best achievable lowest batch,,,,
+full load,0.95,7.6,Infeasible,infeasible: floor above the best achievable lowest batch,,,,
+full load,0.975,7.8,Infeasible,infeasible: floor above the best achievable lowest batch,,,,
+full load,1.0,8.0,Infeasible,infeasible: floor above the best achievable lowest batch,,,,

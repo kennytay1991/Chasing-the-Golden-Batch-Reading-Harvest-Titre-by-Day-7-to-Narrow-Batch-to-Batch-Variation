@@ -1,0 +1,163 @@
+========================================================================================================
+lp_v5.py - harvest plan for one 9-batch plant campaign (mixed-integer linear programme)
+========================================================================================================
+The model in three sentences:
+  Objective: first make the lowest forecast harvest titre among the campaign's 9 batches as high as
+    possible, then, holding that floor, make the campaign's total titre as large as possible.
+  Decisions: for each batch, the harvest culture day (13, 14 or 15) with an inoculation slip of 0 or 1
+    day, whether to intervene, how much extra feed to add (0 to 100 L) and how far to lower the
+    temperature (0 to 3 C), and, in one scenario, whether to pool its harvest with the next batch.
+  Constraints: viability at harvest at or above the trigger, working volume, osmolality, at most one
+    intervention per calendar week, Protein A capacity per harvest, tank turnaround with one maintenance
+    day per tank, at least K days between harvests unless pooled, no Sunday harvests, one blocked
+    downstream day and, where it applies, a site shutdown.
+Solver: HiGHS (highspy) through PuLP 4.1.0, MIP gap 1e-9
+
+[2] Viability scale VIAB_C = 1.2512 (99.5th percentile of VCD/TCD where TCD > 0.05, / 0.99)
+[2] DATA parameters from 60 bench main-product runs (scale == bench, product_low == 0), runs with readings on the days involved:
+    m13 = median(titre13/titre14) = 0.9018 (n = 55); m15 = median(titre15/titre14) = 1.0729 (n = 57); m16 = 1.1673 (n = 23, fence test only)
+    viability: median(viab14 - viab13) = -4.18 points/day (n = 55); median(viab15 - viab14) = -4.94 (n = 57); day 16 vs 14 = -10.80 (n = 25)
+    median(viab14 - viab7) = -22.68 points (n = 58): viability forecast at day 14 = day-7 viability -22.68
+    for reference, on all 69 main-product runs: m13 = 0.8989, m15 = 1.0780, viab change per day -4.15 / -4.80, day 7 to 14 -22.62
+
+[2] Kallang scale s = 8.0 / mean(actual day-14 titre of the 9 runs) = 8.0 / 0.441375 = 18.1252
+[2] Batches (g/L on the Kallang scale; viability in %):
+ batch run  volume_L  tank  fc_day7_0to1  F_g_L  no_model_F_g_L  actual_d13  actual_d14  actual_d15  actual_d16  viab_d7  viab14_forecast  viab_d13  viab_d14  viab_d15
+     0  C1     500.0     0          0.46   8.33            8.07        7.31        7.48        7.72         NaN    94.43            71.75     60.60     46.25     13.87
+     1 C14     250.0     1          0.50   9.12            7.79        9.32        9.70       10.06         NaN    89.98            67.30     68.88     60.30     55.59
+     2 C25     100.0     2          0.58  10.50            7.66       10.63       10.73       11.13         NaN    87.21            64.53     49.67     38.78     33.90
+     3 C37      50.0     0          0.37   6.67            8.31        4.52        5.52        6.07        6.65    92.15            69.47     67.28     65.60     62.16
+     4 C77     250.0     1          0.39   7.13            8.04        6.72        7.65        8.25        9.12    96.11            73.42     87.19     84.92     82.51
+     5 C79     250.0     2          0.40   7.23            8.13        6.05        6.99        7.74        7.72    95.07            72.39     82.40     79.67     78.03
+     6 C88     250.0     0          0.43   7.87            8.07        6.63        7.43        8.53        9.23    93.47            70.78     77.32     72.06     71.38
+     7 C90     250.0     1          0.41   7.47            7.86        8.35        9.13       10.44       11.39    97.00            74.31     83.69     82.13     79.96
+     8 C97     250.0     2          0.41   7.41            8.08        6.59        7.37        8.26         NaN    96.27            73.59     79.52     78.07     76.03
+[3] base      calendar, planned inoculation days: [0, 8, 15, 23, 30, 38, 46, 53, 61]
+[3] full load calendar, planned inoculation days: [0, 6, 11, 17, 23, 28, 34, 40, 45]
+[3] shutdown  calendar, planned inoculation days: [0, 8, 15, 23, 30, 38, 67, 71, 75]; shutdown days 53 to 66
+[3] Maintenance: tank -> cycle whose turnaround is 4 days: {0: 0, 1: 1, 2: 0}; downstream blocked on day(s) [45]
+
+[6] Plans scored on ACTUAL titre and viability (g/L; SD uses n - 1; viability/Protein A columns count batches):
+ calendar                                                      plan     status  planned_lowest_g_L  lowest_g_L  mean_g_L  SD_g_L  CV_pct  range_g_L  total_kg  interventions  viability_below_trigger  above_protein_a               harvest_days
+     base               business as usual (day 14, no intervention)          -                 NaN       5.517     8.000   1.577  19.708      5.211   144.000            0.0                      2.0              1.0 14 14 14 14 14 14 14 14 14
+     base                                   (a) LP with V5 forecast    Optimal               7.718       6.541     9.206   1.494  16.225      4.670   165.701            9.0                      3.0              3.0 15 15 13 15 15 15 15 15 15
+     base                                      (b) LP with no model    Optimal               8.868       6.541     9.368   1.711  18.262      5.498   168.627            9.0                      2.0              3.0 15 15 15 15 15 15 15 15 15
+     base        (c) LP with perfect foresight, fences as specified Infeasible                 NaN         NaN       NaN     NaN     NaN        NaN       NaN            NaN                      NaN              NaN                        NaN
+     base (c') perfect foresight, impossible batch run as BAU (L10)    Optimal               6.541       6.541     8.934   1.246  13.947      4.186   160.809            8.0                      1.0              1.0 13 13 14 15 15 15 15 14 15
+full load               business as usual (day 14, no intervention)          -                 NaN       5.517     8.000   1.577  19.708      5.211   144.000            0.0                      2.0              1.0 14 14 14 14 14 14 14 14 14
+full load                                   (a) LP with V5 forecast    Optimal               7.232       5.986     8.878   1.594  17.952      5.188   159.812            7.0                      2.0              3.0 14 13 13 14 14 15 15 15 15
+full load                                      (b) LP with no model    Optimal               7.937       5.986     8.804   1.745  19.826      5.654   158.474            7.0                      3.0              3.0 14 15 14 14 13 14 15 15 15
+full load        (c) LP with perfect foresight, fences as specified Infeasible                 NaN         NaN       NaN     NaN     NaN        NaN       NaN            NaN                      NaN              NaN                        NaN
+full load (c') perfect foresight, impossible batch run as BAU (L10)    Optimal               5.986       5.986     8.494   1.430  16.837      4.742   152.901            6.0                      1.0              1.0 13 13 14 14 14 14 15 13 15
+    base, (c) LP with perfect foresight, fences as specified: no decision keeps C25 inside the viability and Protein A fences on actual data
+    base, (c') perfect foresight, impossible batch run as BAU (L10): run as BAU: C25
+    full load, (c) LP with perfect foresight, fences as specified: no decision keeps C25 inside the viability and Protein A fences on actual data
+    full load, (c') perfect foresight, impossible batch run as BAU (L10): run as BAU: C25
+[6] Value of V5, base calendar = (a - BAU) / (c' - BAU): lowest batch 1.00, SD 0.25; no model (b - BAU) / (c' - BAU): lowest 1.00, SD -0.41
+[6] Value of V5, full load calendar = (a - BAU) / (c' - BAU): lowest batch 1.00, SD -0.12; no model (b - BAU) / (c' - BAU): lowest 1.00, SD -1.15
+
+[6] Plan (a), base calendar: lowest forecast titre z* = 7.7180 g/L, total forecast 80.3363 g/L x 2000 L = 160.67 kg
+run  tank  inoculation_day  harvest_culture_day  calendar_harvest_day harvest_weekday  intervene  feed_L  temp_shift_C  forecast_before_g_L  forecast_after_g_L  viability_forecast_pct  BAU_actual_g_L  actual_titre_g_L  actual_viability_pct  osmolality_mOsm_kg  kg_actual
+ C1     0                0                   15                    15             Tue          1  100.00          3.00                 8.33                9.64                   72.82            7.48              8.35                 19.87               516.5      16.70
+C14     1                8                   15                    23             Wed          1   93.54          0.00                 9.12               10.00                   62.36            9.70             10.29                 55.59               513.5      20.58
+C25     2               15                   13                    28             Mon          1    0.00          2.53                10.50               10.00                   73.77           10.73             11.17                 54.73               470.0      22.35
+C37     0               23                   15                    38             Thu          1  100.00          3.00                 6.67                7.72                   70.53            5.52              6.54                 68.16               516.5      13.08
+C77     1               31                   15                    46             Fri          1  100.00          3.00                 7.13                8.26                   74.49            7.65              8.90                 88.51               516.5      17.81
+C79     2               38                   15                    53             Fri          1  100.00          3.00                 7.23                8.37                   73.46            6.99              8.34                 84.03               516.5      16.67
+C88     0               46                   15                    61             Sat          1  100.00          3.00                 7.87                9.11                   71.85            7.43              9.16                 77.38               516.5      18.32
+C90     1               53                   15                    68             Sat          1  100.00          3.00                 7.47                8.65                   75.38            9.13             11.21                 85.96               516.5      22.42
+C97     2               62                   15                    77             Mon          1  100.00          3.00                 7.41                8.58                   74.65            7.37              8.89                 82.03               516.5      17.77
+
+[6] Lowest batch in plan (a), worked by hand: C37 (batch 3, tank 0, cycle 1)
+    Calendar: planned inoculation day 23 + slip 0 = day 23; harvest on culture day 15 = calendar day 38 (Thu)
+    Forecast F = V5 day-7 forecast x s = 0.367763 x 18.1252 = 6.6658 g/L (day-14 basis)
+    Harvest day: F x m15 = 6.6658 x 1.0729 = 7.1514 g/L
+    Feed: 100.00 L = 100 x 100.00 / 2000 = 5.000 % of volume; x 0.5 = 2.500 % titre
+    Temperature: 3.00 C x 2.0 %/C = 6.000 % titre
+    Levers: F x 8.500 / 100 = 6.6658 x 0.08500 = 0.5666 g/L
+    Planned T = 7.1514 + 0.5666 = 7.7180 g/L (model value 7.7180; z* = 7.7180)
+    Viability: day-7 92.15 -22.68 (to day 14) -4.94 (day 15) + 2.0 x 3.00 = 70.53 % >= 60
+    Volume: 1900 + 100.00 = 2000.00 L <= 2000; osmolality: 470 + 0.4650 x 100.00 = 516.50 <= 550
+    Protein A: 7.7180 g/L x 2000 L / 1000 = 15.436 kg <= 20
+    ACTUAL: titre on day 15 = 0.335033 x 18.1252 = 6.0725; levers on actual day 14: 5.5170 x 0.08500 = 0.4689; total 6.5415 g/L (business as usual 5.5170)
+    ACTUAL viability on day 15: 62.16 + 2.0 x 3.00 = 68.16 %
+
+[7] Option B: maximise total titre with every batch >= floor (forecast basis; actual columns score the plan):
+ calendar  floor_share_of_target  floor_g_L     status planned_total_kg  planned_lowest_g_L  interventions  actual_total_kg  actual_lowest_g_L
+     base                  0.850        6.8    Optimal       160.672529               7.718            9.0          165.701              6.541
+     base                  0.875        7.0    Optimal       160.672529               7.718            9.0          165.701              6.541
+     base                  0.900        7.2    Optimal       160.672529               7.718            9.0          165.701              6.541
+     base                  0.925        7.4    Optimal       160.672529               7.718            9.0          165.701              6.541
+     base                  0.950        7.6    Optimal       160.672529               7.718            9.0          165.701              6.541
+     base                  0.975        7.8 Infeasible       infeasible                 NaN            NaN              NaN                NaN
+     base                  1.000        8.0 Infeasible       infeasible                 NaN            NaN              NaN                NaN
+full load                  0.850        6.8    Optimal       154.351469               7.037            7.0          159.039              5.986
+full load                  0.875        7.0    Optimal       154.351469               7.037            7.0          159.039              5.986
+full load                  0.900        7.2    Optimal        152.76646               7.232            7.0          159.812              5.986
+full load                  0.925        7.4 Infeasible       infeasible                 NaN            NaN              NaN                NaN
+full load                  0.950        7.6 Infeasible       infeasible                 NaN            NaN              NaN                NaN
+full load                  0.975        7.8 Infeasible       infeasible                 NaN            NaN              NaN                NaN
+full load                  1.000        8.0 Infeasible       infeasible                 NaN            NaN              NaN                NaN
+
+[8] Binding fences: gain in the lowest forecast batch (g/L) from relaxing each fence alone, plan (a):
+ calendar                  fence_relaxed  status  lowest_before_g_L  lowest_after_g_L  gain_lowest_g_L  gain_total_kg  actual_lowest_after_g_L  gain_actual_lowest_g_L
+     base    viability trigger -5 points Optimal             7.7180            7.7180           0.0000         0.0000                   6.5415                  0.0000
+     base       +1 intervention per week Optimal             7.7180            7.7180           0.0000         0.0000                   6.5415                  0.0000
+     base            +50 L feed headroom Optimal             7.7180            7.8013           0.0833         1.3028                   6.6104                  0.0690
+     base     K - 1 day between harvests Optimal             7.7180            7.7180           0.0000         0.0000                   6.5415                  0.0000
+     base +1 day harvest window (day 16) Optimal             7.7180            8.3476           0.6296         8.9856                      NaN                     NaN
+     base                 no Sunday rule Optimal             7.7180            7.7180           0.0000         0.0000                   6.5415                  0.0000
+full load    viability trigger -5 points Optimal             7.2324            7.2324           0.0000         0.0000                   5.9860                  0.0000
+full load       +1 intervention per week Optimal             7.2324            7.2324           0.0000         2.6863                   5.9860                  0.0000
+full load            +50 L feed headroom Optimal             7.2324            7.3157           0.0833         1.1358                   6.0550                  0.0690
+full load     K - 1 day between harvests Optimal             7.2324            7.2324           0.0000         0.0000                   5.9860                  0.0000
+full load +1 day harvest window (day 16) Optimal             7.2324            7.2324           0.0000         3.2460                      NaN                     NaN
+full load                 no Sunday rule Optimal             7.2324            7.7180           0.4856         0.9922                   6.5415                  0.5555
+
+[9] Scenarios (plan a, scored on actual data):
+             scenario  calendar  trigger_pct  pooling     status  pairs_that_could_share_a_day planned_lowest_g_L  planned_total_kg  pools_used  slips_used  lowest_g_L  mean_g_L  SD_g_L  CV_pct  range_g_L  total_kg  interventions  viability_below_trigger  above_protein_a               harvest_days
+                 base      base         60.0    False    Optimal                             0           7.717984           160.673         0.0         2.0       6.541     9.206   1.494  16.225      4.670   165.701            9.0                      3.0              3.0 15 15 13 15 15 15 15 15 15
+full load (64 a year) full load         60.0    False    Optimal                             0           7.232364           152.766         0.0         4.0       5.986     8.878   1.594  17.952      5.188   159.812            7.0                      2.0              3.0 14 13 13 14 14 15 15 15 15
+   shutdown (14 days)  shutdown         60.0    False    Optimal                             0           7.717984           158.359         0.0         2.0       6.541     9.053   1.592  17.590      4.670   162.953            8.0                      3.0              3.0 15 15 13 15 15 14 15 15 15
+          trigger 70%      base         70.0    False    Optimal                             0           7.717984           160.468         0.0         2.0       6.541     9.231   1.516  16.426      4.670   166.164            9.0                      4.0              3.0 15 14 13 15 15 15 15 15 15
+          trigger 80%      base         80.0    False Infeasible                             0         infeasible               NaN         NaN         NaN         NaN       NaN     NaN     NaN        NaN       NaN            NaN                      NaN              NaN                        NaN
+      pooling allowed      base         60.0     True    Optimal                             0           7.717984           160.673         0.0         2.0       6.541     9.206   1.494  16.225      4.670   165.701            9.0                      3.0              3.0 15 15 13 15 15 15 15 15 15
+
+[10] Lever-effect sweep (base calendar; temperature viability effect held at 2 points per C):
+            kind  feed_eff_pct_per_pct_vol  temp_eff_pct_per_C  temp_viab_pts_per_C  status  planned_lowest_g_L  planned_total_kg  interventions  feed_L_total  temp_C_total  actual_lowest_g_L  actual_SD_g_L
+            grid                      0.00                0.00                  2.0 Optimal               7.151           150.324              0         0.000         0.000              6.073          1.490
+            grid                      0.00                2.00                  2.0 Optimal               7.551           158.067              9         0.000        24.700              6.404          1.525
+            grid                      0.00                4.00                  2.0 Optimal               7.951           164.320              9         0.000        22.850              6.735          1.457
+            grid                      0.50                0.00                  2.0 Optimal               7.318           153.881              9       893.538         0.000              6.210          1.526
+            grid                      0.50                2.00                  2.0 Optimal               7.718           160.673              9       793.538        23.531              6.541          1.494
+            grid                      0.50                4.00                  2.0 Optimal               8.118           166.642              9       725.305        22.265              6.873          1.446
+            grid                      1.50                0.00                  2.0 Optimal               7.651           159.630              9       798.661         0.000              6.486          1.506
+            grid                      1.50                2.00                  2.0 Optimal               8.051           165.766              9       789.250        21.000              6.817          1.448
+            grid                      1.50                4.00                  2.0 Optimal               8.451           171.020              9       709.250        21.000              7.148          1.449
+break-even probe                      0.01                0.00                  2.0 Optimal               7.155           150.396              9       899.978         0.000              6.075          1.491
+break-even probe                      0.00                0.01                  2.0 Optimal               7.153           150.367              9         0.000        26.999              6.074          1.491
+[10] Break-even: with both titre effects at 0 the plan uses 0 interventions (temperature shift 0.00 C in total); feed is used from an effect of 0.01 (900 L) and temperature from 0.01 (27.0 C). Interventions carry no cost in this model, so the break-even effect is zero: any positive effect makes them worth choosing.
+
+[11] Monte Carlo, 500 draws (seed 20261021, 29 s): forecast x (1 + N(0, 0.1)), true effects U(0, 1.5) / U(0, 4) / U(0, 4), each batch fails with p = 0.05; plans use the CONFIG effects (L4)
+     feasible plans: 369 of 500; batches alive per draw: mean 8.52
+     no feasible plan in 131 draws, because: {'forecast puts C25 (Protein A) outside the fence on every allowed day': 120, 'forecast puts C14 (Protein A) outside the fence on every allowed day': 9, 'forecast puts C14 (Protein A), C25 (Protein A) outside the fence on every allowed day': 2}
+     all 500 draws, business as usual whenever no plan is feasible: lowest batch >= 7.20 g/L in 5.4% (BAU alone 0.2%); lowest 6.487 [5.517, 6.956] g/L; SD 1.574 [1.403, 1.673] g/L, below BAU in 50.4% of draws
+     feasible draws only:
+     lowest batch >= 7.20 g/L (90% of target): plan 7.3% of draws, business as usual 0.3%
+     lowest batch, median [10th, 90th percentile]: plan 6.625 [6.309, 6.993], BAU 5.517 [5.517, 5.517] g/L
+     batch-to-batch SD: plan 1.535 [1.376, 1.670], BAU 1.577 [1.360, 1.670] g/L; plan SD below BAU SD in 68.3% of draws
+     actual viability below trigger: plan 2.09 batches per draw (98.9% of draws with any), BAU 1.86 (98.9%)
+     batches above Protein A capacity (actual): plan 2.63 per draw
+
+[12] Checks
+  [PASS] BAU mean = 8.000000 g/L (target 8.00)
+  [PASS] day-14 titre from the raw sheet equals V5's actual_titre_plan_day (max diff 5.6e-17)
+  [PASS] every solve is Optimal except stage-1 / floor solves that are infeasible by the fences, reported above: 1357 solves, {'Optimal': 1217, 'Infeasible': 140}
+         infeasible (not errors): {'monte carlo': 131, 'option B, base, floor 7.80': 1, 'option B, base, floor 8.00': 1, 'option B, full load, floor 7.40': 1, 'option B, full load, floor 7.60': 1, 'option B, full load, floor 7.80': 1, 'option B, full load, floor 8.00': 1, 'plan c, base': 1, 'plan c, full load': 1, 'scenario: trigger 80%': 1}
+  [PASS] constraints recomputed from the solution values in every optimal solve: max violation 9.09e-13 (limit 1e-06)
+  [PASS] perfect-foresight plan (c') scores exactly its own objective on actual data (z* 6.5415)
+  [PASS] plan (a): the lowest batch recomputed from the final plan equals z* (7.7180)
+  [PASS] harvest order equals batch order on every calendar used (L5; the script stops otherwise)
+  [PASS] lowest-batch arithmetic printed by hand in [6]
+
+Outputs in C:\Users\tiffa\OneDrive\Desktop\Lessons for business analytics\Chasing the Golden Batch Reading Harvest Titre by Day 7 to Narrow Batch to Batch Variation\outputs_lp (11 files); run time 36 s

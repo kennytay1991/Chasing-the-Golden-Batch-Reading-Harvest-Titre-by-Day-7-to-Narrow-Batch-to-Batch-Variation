@@ -1,0 +1,15 @@
+calendar,floor_share_of_target,floor_g_L,status,planned_total_kg,planned_lowest_g_L,interventions,actual_total_kg,actual_lowest_g_L
+base,0.85,6.8,Optimal,160.67252940260275,7.718,9.0,165.7012,6.5415
+base,0.875,7.0,Optimal,160.67252940260275,7.718,9.0,165.7012,6.5415
+base,0.9,7.2,Optimal,160.67252940260275,7.718,9.0,165.7012,6.5415
+base,0.925,7.4,Optimal,160.67252940260275,7.718,9.0,165.7012,6.5415
+base,0.95,7.6,Optimal,160.67252940260275,7.718,9.0,165.7012,6.5415
+base,0.975,7.8,Infeasible,infeasible,,,,
+base,1.0,8.0,Infeasible,infeasible,,,,
+full load,0.85,6.8,Optimal,154.35146915572963,7.0373,7.0,159.0392,5.986
+full load,0.875,7.0,Optimal,154.35146915572963,7.0373,7.0,159.0392,5.986
+full load,0.9,7.2,Optimal,152.76645950042877,7.2324,7.0,159.8121,5.986
+full load,0.925,7.4,Infeasible,infeasible,,,,
+full load,0.95,7.6,Infeasible,infeasible,,,,
+full load,0.975,7.8,Infeasible,infeasible,,,,
+full load,1.0,8.0,Infeasible,infeasible,,,,

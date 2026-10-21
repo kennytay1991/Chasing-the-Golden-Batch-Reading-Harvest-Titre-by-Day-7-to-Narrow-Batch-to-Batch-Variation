@@ -1,0 +1,28 @@
+plan,run,harvest_culture_day,calendar_harvest_day,kg_actual,protein_a_utilisation,dead_cell_density,actual_viability_pct,DS1_protein_a_ok,DS2_dead_cells_ok,DS3_viability_ok,DS4_downstream_time_ok,DS4_gap_after_days,DS4_gap_needed_days
+business as usual,C1,14,14,14.958,0.6233,0.2076,46.2529,True,True,False,True,8.0,2.8046
+business as usual,C14,14,22,19.3908,0.8079,0.1234,60.2988,True,True,True,True,7.0,3.6358
+business as usual,C25,14,29,21.4559,0.894,0.2745,38.7753,True,True,False,True,8.0,4.023
+business as usual,C37,14,37,11.0341,0.4598,0.101,65.5991,True,True,True,True,7.0,2.0689
+business as usual,C77,14,44,15.3082,0.6378,0.0392,84.9228,True,True,True,True,8.0,2.8703
+business as usual,C79,14,52,13.9892,0.5829,0.0508,79.6667,True,True,True,True,8.0,2.623
+business as usual,C88,14,60,14.8686,0.6195,0.075,72.0611,True,True,True,True,7.0,2.7879
+business as usual,C90,14,67,18.2641,0.761,0.0619,82.135,True,True,True,True,8.0,3.4245
+business as usual,C97,14,75,14.7312,0.6138,0.0775,78.0661,True,True,True,True,,2.7621
+recipe day 15,C1,13,13,14.613,0.6089,0.1514,60.5995,True,True,True,True,9.0,2.7399
+recipe day 15,C14,14,22,19.3908,0.8079,0.1234,60.2988,True,True,True,True,6.0,3.6358
+recipe day 15,C25,13,28,21.2621,0.8859,0.2033,49.6718,True,True,False,True,9.0,3.9866
+recipe day 15,C37,14,37,11.0341,0.4598,0.101,65.5991,True,True,True,True,9.0,2.0689
+recipe day 15,C77,15,46,16.5039,0.6877,0.0451,82.5097,True,True,True,True,7.0,3.0945
+recipe day 15,C79,15,53,15.4855,0.6452,0.053,78.027,True,True,True,True,8.0,2.9035
+recipe day 15,C88,15,61,17.0515,0.7105,0.0765,71.3838,True,True,True,True,7.0,3.1972
+recipe day 15,C90,15,68,20.8703,0.8696,0.0691,79.9589,True,True,True,True,9.0,3.9132
+recipe day 15,C97,15,77,16.5218,0.6884,0.0779,76.0254,True,True,True,True,,3.0978
+recipe day 15 + bench trial confirms levers,C1,13,13,14.613,0.6089,0.1514,60.5995,True,True,True,True,9.0,2.7399
+recipe day 15 + bench trial confirms levers,C14,14,22,19.3908,0.8079,0.1234,60.2988,True,True,True,True,6.0,3.6358
+recipe day 15 + bench trial confirms levers,C25,13,28,21.2621,0.8859,0.2033,49.6718,True,True,False,True,10.0,3.9866
+recipe day 15 + bench trial confirms levers,C37,15,38,13.083,0.5451,0.0846,68.1642,True,True,True,True,8.0,2.4531
+recipe day 15 + bench trial confirms levers,C77,15,46,17.8051,0.7419,0.0276,88.5097,True,True,True,True,7.0,3.3385
+recipe day 15 + bench trial confirms levers,C79,15,53,15.4855,0.6452,0.053,78.027,True,True,True,True,8.0,2.9035
+recipe day 15 + bench trial confirms levers,C88,15,61,17.0515,0.7105,0.0765,71.3838,True,True,True,True,7.0,3.1972
+recipe day 15 + bench trial confirms levers,C90,15,68,20.8703,0.8696,0.0691,79.9589,True,True,True,True,9.0,3.9132
+recipe day 15 + bench trial confirms levers,C97,15,77,16.5218,0.6884,0.0779,76.0254,True,True,True,True,,3.0978

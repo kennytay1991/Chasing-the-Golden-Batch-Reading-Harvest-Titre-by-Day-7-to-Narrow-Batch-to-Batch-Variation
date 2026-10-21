@@ -1,0 +1,15 @@
+calendar,fence_relaxed,status,lowest_before_g_L,lowest_after_g_L,gain_lowest_g_L,gain_total_kg,actual_lowest_after_g_L,gain_actual_lowest_g_L,gain_actual_total_kg
+base,viability trigger -5 points,Optimal,7.1514,7.1514,0.0,1.5298,6.0725,0.5555,1.8428
+base,+1 intervention per week,Optimal,7.1514,7.1514,0.0,0.0,5.517,0.0,0.0
+base,+1 intervention in the campaign budget,Optimal,7.1514,7.1514,0.0,0.0,5.517,0.0,0.0
+base,+50 L feed headroom,Optimal,7.1514,7.1514,0.0,0.0,5.517,0.0,0.0
+base,K - 1 day between harvests,Optimal,7.1514,7.1514,0.0,0.0,5.517,0.0,0.0
+base,+1 day harvest window (day 16),Optimal,7.1514,7.1514,0.0,7.0974,,,
+base,no Sunday rule,Optimal,7.1514,7.1514,0.0,0.0,5.517,0.0,0.0
+full load,viability trigger -5 points,Optimal,6.6658,6.6658,0.0,0.0,5.517,0.0,0.0
+full load,+1 intervention per week,Optimal,6.6658,6.6658,0.0,0.0,5.517,0.0,0.0
+full load,+1 intervention in the campaign budget,Optimal,6.6658,6.6658,0.0,0.0,5.517,0.0,0.0
+full load,+50 L feed headroom,Optimal,6.6658,6.6658,0.0,0.0,5.517,0.0,0.0
+full load,K - 1 day between harvests,Optimal,6.6658,6.6658,0.0,0.0,5.517,0.0,4.1758
+full load,+1 day harvest window (day 16),Optimal,6.6658,6.6658,0.0,1.4118,5.517,0.0,0.0
+full load,no Sunday rule,Optimal,6.6658,7.1312,0.4654,1.1272,5.517,0.0,2.318

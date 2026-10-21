@@ -1,0 +1,7 @@
+scenario,calendar,trigger_pct,pooling,status,pairs_that_could_share_a_day,planned_lowest_g_L,planned_total_kg,pools_used,slips_used,lowest_g_L,mean_g_L,SD_g_L,CV_pct,range_g_L,total_kg,interventions,viability_below_trigger,above_protein_a,harvest_days
+base,base,60.0,False,Optimal,0,7.717983757712102,160.6725,0.0,2.0,6.5415,9.2056,1.4936,16.2247,4.6699,165.7012,9.0,3.0,3.0,15 15 13 15 15 15 15 15 15
+full load (64 a year),full load,60.0,False,Optimal,0,7.232363736561843,152.7665,0.0,4.0,5.986,8.8785,1.5938,17.9517,5.188,159.8121,7.0,2.0,3.0,14 13 13 14 14 15 15 15 15
+shutdown (14 days),shutdown,60.0,False,Optimal,0,7.717983757712102,158.3594,0.0,2.0,6.5415,9.0529,1.5924,17.5902,4.6699,162.9527,8.0,3.0,3.0,15 15 13 15 15 14 15 15 15
+trigger 70%,base,70.0,False,Optimal,0,7.717983757712102,160.4675,0.0,2.0,6.5415,9.2313,1.5164,16.4263,4.6699,166.1642,9.0,4.0,3.0,15 14 13 15 15 15 15 15 15
+trigger 80%,base,80.0,False,Infeasible,0,infeasible,,,,,,,,,,,,,
+pooling allowed,base,60.0,True,Optimal,0,7.717983757712102,160.6725,0.0,2.0,6.5415,9.2056,1.4936,16.2247,4.6699,165.7012,9.0,3.0,3.0,15 15 13 15 15 15 15 15 15
